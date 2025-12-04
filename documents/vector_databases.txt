@@ -1,0 +1,35 @@
+Vector Databases and Semantic Search
+
+Vector databases are specialized databases designed to store, index, and query high-dimensional vectors efficiently. Unlike traditional databases that store structured data, vector databases are optimized for similarity search operations.
+
+Embeddings are numerical representations of data (text, images, audio) in a high-dimensional vector space. Similar items have similar embeddings, meaning their vectors are close together in this space. Embeddings capture semantic meaning, allowing for semantic similarity search.
+
+Semantic Search is a search technique that understands the meaning and context of queries rather than just matching keywords. It uses vector embeddings to find content that is semantically similar to the query, even if the exact words don't match.
+
+FAISS (Facebook AI Similarity Search) is an open-source library developed by Facebook for efficient similarity search and clustering of dense vectors. It provides various indexing methods optimized for different use cases, from exact search to approximate nearest neighbor search.
+
+Pinecone is a managed vector database service that provides a simple API for storing and querying vectors. It handles infrastructure, scaling, and optimization, making it easy to add vector search capabilities to applications.
+
+Chroma is an open-source embedding database that makes it easy to build applications with embeddings. It provides a simple Python API and can run locally or be deployed as a server.
+
+Weaviate is an open-source vector search engine that can store both objects and vectors. It supports hybrid search combining keyword and vector search, and includes built-in machine learning models.
+
+Milvus is an open-source vector database built for scalable similarity search and AI applications. It supports various indexing algorithms and can handle billions of vectors.
+
+Vector Indexing is the process of organizing vectors in a way that enables fast similarity search. Common indexing methods include flat indexes for exact search, inverted file indexes, and product quantization for approximate search.
+
+Similarity Metrics measure how similar two vectors are. Common metrics include:
+- Cosine Similarity: Measures the cosine of the angle between two vectors
+- Euclidean Distance: Measures the straight-line distance between vectors
+- Dot Product: Measures the product of vector magnitudes and cosine of angle
+
+Use Cases for vector databases include:
+- Recommendation systems
+- Image and video search
+- Natural language search
+- Anomaly detection
+- Clustering and classification
+- Retrieval-Augmented Generation (RAG) systems
+
+Performance Considerations include indexing time, query latency, memory usage, and accuracy trade-offs between exact and approximate search methods.
+
