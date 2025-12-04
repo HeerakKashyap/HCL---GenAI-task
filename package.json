@@ -1,0 +1,13 @@
+{
+  "name": "rag-powered-assistant",
+  "version": "1.0.0",
+  "description": "Mini RAG-Powered Assistant for GenAI Evaluation",
+  "scripts": {
+    "start": "python app.py",
+    "dev": "python app.py"
+  },
+  "keywords": ["rag", "genai", "hackathon"],
+  "author": "",
+  "license": "MIT"
+}
+
