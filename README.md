@@ -157,31 +157,6 @@ Edit `config.py` or set environment variables:
 - `LLM_MODEL`: LLM model name (default: llama3)
 - `LLM_PROVIDER`: LLM provider (default: ollama)
 
-## Deployment
-
-### Frontend on Vercel
-
-1. Install Vercel CLI: `npm install -g vercel`
-2. Navigate to client folder: `cd client`
-3. Deploy: `vercel`
-4. Set environment variable: `REACT_APP_API_URL` = your backend URL
-
-### Backend on Railway/Render
-
-**Railway:**
-1. Go to https://railway.app
-2. New Project → Deploy from GitHub
-3. Select repository
-4. Add environment variables if needed
-5. Deploy
-
-**Render:**
-1. Go to https://render.com
-2. New → Web Service
-3. Connect GitHub repo
-4. Build: `pip install -r requirements.txt`
-5. Start: `python app.py`
-6. Deploy
 
 ## How It Works
 
