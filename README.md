@@ -1,6 +1,9 @@
 # Mini RAG-Powered Assistant
 
 A Retrieval-Augmented Generation (RAG) system that answers questions based on a custom document corpus using advanced chunking techniques, vector similarity search, and local LLM integration.
+## Live Demo
+
+🌐 **Deployed Application**: [https://hcl-genai-task-1.onrender.com](https://hcl-genai-task-1.onrender.com)
 
 ## Features
 
