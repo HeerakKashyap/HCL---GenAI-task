@@ -4,9 +4,15 @@ from config import Config
 
 try:
     from openai import OpenAI
-    openai_client = OpenAI(api_key=Config.OPENAI_API_KEY) if Config.OPENAI_API_KEY else None
+    openai_client = OpenAI(api_key=Config.OPENAI_API_KEY) if Config.OPENAI_API_KEY and Config.LLM_PROVIDER == 'openai' else None
 except:
     openai_client = None
+
+try:
+    import ollama
+    ollama_available = True
+except:
+    ollama_available = False
 
 class ChunkingStrategies:
     def __init__(self):
@@ -87,35 +93,66 @@ class ChunkingStrategies:
         return chunks
     
     def _generate_qa_pairs(self, text: str) -> List[tuple]:
-        if not openai_client:
-            return []
-        
         try:
-            prompt = f"""Generate 2-3 question-answer pairs based on this text. Format as Q: question\nA: answer\n\nText: {text[:500]}"""
-            
-            response = openai_client.chat.completions.create(
-                model='gpt-3.5-turbo',
-                messages=[{'role': 'user', 'content': prompt}],
-                temperature=0.3,
-                max_tokens=200
-            )
-            
-            qa_text = response.choices[0].message.content
-            qa_pairs = []
-            lines = qa_text.split('\n')
-            current_q = None
-            
-            for line in lines:
-                if line.startswith('Q:'):
-                    current_q = line[2:].strip()
-                elif line.startswith('A:') and current_q:
-                    qa_pairs.append((current_q, line[2:].strip()))
-                    current_q = None
-            
-            return qa_pairs[:3]
-        except Exception as e:
-            print(f"Error generating QA pairs: {e}")
-            return []
+            import ollama
+            use_ollama = True
+        except:
+            use_ollama = False
+        
+        if use_ollama and Config.LLM_PROVIDER == 'ollama':
+            try:
+                prompt = f"""Generate 2-3 question-answer pairs based on this text. Format as Q: question\nA: answer\n\nText: {text[:500]}"""
+                
+                response = ollama.chat(
+                    model=Config.LLM_MODEL,
+                    messages=[{'role': 'user', 'content': prompt}],
+                    options={'temperature': 0.3, 'num_predict': 200}
+                )
+                
+                qa_text = response['message']['content']
+                qa_pairs = []
+                lines = qa_text.split('\n')
+                current_q = None
+                
+                for line in lines:
+                    if line.startswith('Q:'):
+                        current_q = line[2:].strip()
+                    elif line.startswith('A:') and current_q:
+                        qa_pairs.append((current_q, line[2:].strip()))
+                        current_q = None
+                
+                return qa_pairs[:3]
+            except Exception as e:
+                print(f"Error generating QA pairs with Ollama: {e}")
+                return []
+        
+        if openai_client and Config.OPENAI_API_KEY and Config.LLM_PROVIDER == 'openai':
+            try:
+                prompt = f"""Generate 2-3 question-answer pairs based on this text. Format as Q: question\nA: answer\n\nText: {text[:500]}"""
+                
+                response = openai_client.chat.completions.create(
+                    model='gpt-3.5-turbo',
+                    messages=[{'role': 'user', 'content': prompt}],
+                    temperature=0.3,
+                    max_tokens=200
+                )
+                
+                qa_text = response.choices[0].message.content
+                qa_pairs = []
+                lines = qa_text.split('\n')
+                current_q = None
+                
+                for line in lines:
+                    if line.startswith('Q:'):
+                        current_q = line[2:].strip()
+                    elif line.startswith('A:') and current_q:
+                        qa_pairs.append((current_q, line[2:].strip()))
+                        current_q = None
+                
+                return qa_pairs[:3]
+            except Exception as e:
+                print(f"Error generating QA pairs: {e}")
+                return []
     
     def technique5_query_transformation(self, text: str, metadata: Dict) -> List[Dict]:
         chunks = self.technique2_semantic_chunking(text, metadata)

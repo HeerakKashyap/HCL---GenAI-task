@@ -5,9 +5,15 @@ from config import Config
 
 try:
     from openai import OpenAI
-    openai_client = OpenAI(api_key=Config.OPENAI_API_KEY) if Config.OPENAI_API_KEY else None
+    openai_client = OpenAI(api_key=Config.OPENAI_API_KEY) if Config.OPENAI_API_KEY and Config.LLM_PROVIDER == 'openai' else None
 except:
     openai_client = None
+
+try:
+    import ollama
+    ollama_available = True
+except:
+    ollama_available = False
 
 class QueryProcessor:
     def __init__(self, embedding_generator: EmbeddingGenerator, vector_store: VectorStore):
@@ -16,26 +22,44 @@ class QueryProcessor:
         self.use_local_llm = Config.USE_LOCAL_LLM
     
     def transform_query(self, query: str) -> str:
-        if not openai_client:
-            return query
-        
-        try:
-            prompt = f"""Rewrite this query to improve retrieval from a document corpus. Keep the core meaning but make it more specific and searchable.
+        if Config.LLM_PROVIDER == 'ollama' and ollama_available:
+            try:
+                prompt = f"""Rewrite this query to improve retrieval from a document corpus. Keep the core meaning but make it more specific and searchable.
 
 Original query: {query}
 Rewritten query:"""
-            
-            response = openai_client.chat.completions.create(
-                model='gpt-3.5-turbo',
-                messages=[{'role': 'user', 'content': prompt}],
-                temperature=0.3,
-                max_tokens=100
-            )
-            
-            transformed = response.choices[0].message.content.strip()
-            return transformed if transformed else query
-        except Exception as e:
-            print(f"Query transformation error: {e}")
+                
+                response = ollama.chat(
+                    model=Config.LLM_MODEL,
+                    messages=[{'role': 'user', 'content': prompt}],
+                    options={'temperature': 0.3, 'num_predict': 100}
+                )
+                
+                transformed = response['message']['content'].strip()
+                return transformed if transformed else query
+            except Exception as e:
+                print(f"Query transformation error: {e}")
+                return query
+        elif openai_client and Config.OPENAI_API_KEY:
+            try:
+                prompt = f"""Rewrite this query to improve retrieval from a document corpus. Keep the core meaning but make it more specific and searchable.
+
+Original query: {query}
+Rewritten query:"""
+                
+                response = openai_client.chat.completions.create(
+                    model='gpt-3.5-turbo',
+                    messages=[{'role': 'user', 'content': prompt}],
+                    temperature=0.3,
+                    max_tokens=100
+                )
+                
+                transformed = response.choices[0].message.content.strip()
+                return transformed if transformed else query
+            except Exception as e:
+                print(f"Query transformation error: {e}")
+                return query
+        else:
             return query
     
     def retrieve_context(self, query_embedding, top_k: int = None) -> List[Dict]:
@@ -58,53 +82,115 @@ Question: {query}
 
 Answer based only on the context provided:"""
         
-        if not openai_client:
+        if not context_chunks:
             return {
-                'answer': 'OpenAI API key not configured',
+                'answer': 'No relevant information found in the documents. Please try a different query.',
                 'sources': [],
                 'tokens_used': {},
                 'chunks_retrieved': 0
             }
         
-        try:
-            response = openai_client.chat.completions.create(
-                model=Config.LLM_MODEL,
-                messages=[
-                    {'role': 'system', 'content': system_prompt},
-                    {'role': 'user', 'content': user_prompt}
-                ],
-                temperature=0.3,
-                max_tokens=500
-            )
+        if Config.LLM_PROVIDER == 'ollama' and ollama_available:
+            try:
+                response = ollama.chat(
+                    model=Config.LLM_MODEL,
+                    messages=[
+                        {'role': 'system', 'content': system_prompt},
+                        {'role': 'user', 'content': user_prompt}
+                    ],
+                    options={'temperature': 0.3, 'num_predict': 500}
+                )
+                
+                answer = response['message']['content']
+                
+                sources = []
+                for chunk in context_chunks:
+                    source_info = {
+                        'filename': chunk.get('metadata', {}).get('filename', 'unknown'),
+                        'similarity': chunk.get('similarity_score', 0),
+                        'technique': chunk.get('technique', 'unknown')
+                    }
+                    sources.append(source_info)
+                
+                return {
+                    'answer': answer,
+                    'sources': sources,
+                    'tokens_used': {
+                        'prompt_tokens': response.get('prompt_eval_count', 0),
+                        'completion_tokens': response.get('eval_count', 0),
+                        'total_tokens': response.get('prompt_eval_count', 0) + response.get('eval_count', 0)
+                    },
+                    'chunks_retrieved': len(context_chunks)
+                }
+            except Exception as e:
+                print(f"Ollama error: {e}")
+                return {
+                    'answer': f"Error generating response: {str(e)}. Make sure Ollama is running and model is installed.",
+                    'sources': [],
+                    'tokens_used': {},
+                    'chunks_retrieved': 0
+                }
+        elif openai_client and Config.LLM_PROVIDER == 'openai':
+            try:
+                response = openai_client.chat.completions.create(
+                    model=Config.LLM_MODEL,
+                    messages=[
+                        {'role': 'system', 'content': system_prompt},
+                        {'role': 'user', 'content': user_prompt}
+                    ],
+                    temperature=0.3,
+                    max_tokens=500
+                )
+                
+                answer = response.choices[0].message.content
+                usage = response.usage
+                
+                sources = []
+                for chunk in context_chunks:
+                    source_info = {
+                        'filename': chunk.get('metadata', {}).get('filename', 'unknown'),
+                        'similarity': chunk.get('similarity_score', 0),
+                        'technique': chunk.get('technique', 'unknown')
+                    }
+                    sources.append(source_info)
+                
+                return {
+                    'answer': answer,
+                    'sources': sources,
+                    'tokens_used': {
+                        'prompt_tokens': usage.prompt_tokens,
+                        'completion_tokens': usage.completion_tokens,
+                        'total_tokens': usage.total_tokens
+                    },
+                    'chunks_retrieved': len(context_chunks)
+                }
+            except Exception as e:
+                return {
+                    'answer': f"Error generating response: {str(e)}",
+                    'sources': [],
+                    'tokens_used': {},
+                    'chunks_retrieved': 0
+                }
+        else:
+            answer_parts = []
+            for i, chunk in enumerate(context_chunks[:Config.TOP_K], 1):
+                chunk_text = chunk.get('text', '')
+                if chunk_text:
+                    answer_parts.append(f"[Source {i}: {chunk.get('metadata', {}).get('filename', 'unknown')}]\n{chunk_text}")
             
-            answer = response.choices[0].message.content
-            usage = response.usage
-            
-            sources = []
-            for chunk in context_chunks:
-                source_info = {
+            return {
+                'answer': '\n\n'.join(answer_parts),
+                'sources': [{
                     'filename': chunk.get('metadata', {}).get('filename', 'unknown'),
                     'similarity': chunk.get('similarity_score', 0),
                     'technique': chunk.get('technique', 'unknown')
-                }
-                sources.append(source_info)
-            
-            return {
-                'answer': answer,
-                'sources': sources,
+                } for chunk in context_chunks],
                 'tokens_used': {
-                    'prompt_tokens': usage.prompt_tokens,
-                    'completion_tokens': usage.completion_tokens,
-                    'total_tokens': usage.total_tokens
+                    'prompt_tokens': 0,
+                    'completion_tokens': 0,
+                    'total_tokens': 0
                 },
                 'chunks_retrieved': len(context_chunks)
-            }
-        except Exception as e:
-            return {
-                'answer': f"Error generating response: {str(e)}",
-                'sources': [],
-                'tokens_used': {},
-                'chunks_retrieved': 0
             }
     
     def process_query(self, query: str, use_transformation: bool = True) -> Dict:
